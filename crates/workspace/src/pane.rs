@@ -273,6 +273,8 @@ actions!(
         TogglePinTab,
         /// Unpins all tabs in the pane.
         UnpinAllTabs,
+        /// Compares the current item with the active item.
+        CompareWithActiveTab,
     ]
 );
 
@@ -3015,6 +3017,7 @@ impl Pane {
         let has_items_to_right = ix < total_items - 1;
         let has_clean_items = self.items.iter().any(|item| !item.is_dirty(cx));
         let is_pinned = self.is_tab_pinned(ix);
+        let is_active = self.active_item_index() == ix;
 
         let pane = cx.entity().downgrade();
         let menu_context = item.item_focus_handle(cx);
@@ -3167,6 +3170,29 @@ impl Pane {
                                 }
                             })
                         };
+                        if !is_active {
+                            menu = menu.entry(
+                                "Compare with active tab",
+                                Some(CompareWithActiveTab.boxed_clone()),
+                                window.handler_for(&pane, move |pane, window, cx| {
+                                    let selected_files = self.file_abs_paths_to_diff(cx);
+                                    if let Some((file_path1, file_path2)) = selected_files {
+                                        self.workspace
+                                            .update(cx, |workspace, cx| {
+                                                FileDiffView::open(
+                                                    file_path1,
+                                                    file_path2,
+                                                    workspace.weak_handle(),
+                                                    window,
+                                                    cx,
+                                                )
+                                                .detach_and_log_err(cx);
+                                            })
+                                            .ok();
+                                    }
+                                }),
+                            );
+                        }
 
                         if capability != Capability::ReadOnly {
                             let read_only_label = if capability.editable() {

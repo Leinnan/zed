@@ -1,6 +1,6 @@
 use crate::{
-    CloseWindow, NewFile, NewTerminal, OpenInTerminal, OpenOptions, OpenTerminal, OpenVisible,
-    SplitDirection, ToggleFileFinder, ToggleProjectSymbols, ToggleZoom, Workspace,
+    CloseWindow, CompareFiles, NewFile, NewTerminal, OpenInTerminal, OpenOptions, OpenTerminal,
+    OpenVisible, SplitDirection, ToggleFileFinder, ToggleProjectSymbols, ToggleZoom, Workspace,
     WorkspaceItemBuilder, ZoomIn, ZoomOut,
     invalid_item_view::InvalidItemView,
     item::{
@@ -3171,27 +3171,37 @@ impl Pane {
                             })
                         };
                         if !is_active {
-                            menu = menu.entry(
-                                "Compare with active tab",
-                                Some(CompareWithActiveTab.boxed_clone()),
-                                window.handler_for(&pane, move |pane, window, cx| {
-                                    // let selected_files = self.file_abs_paths_to_diff(cx);
-                                    // if let Some((file_path1, file_path2)) = selected_files {
-                                    //     self.workspace
-                                    //         .update(cx, |workspace, cx| {
-                                    //             FileDiffView::open(
-                                    //                 file_path1,
-                                    //                 file_path2,
-                                    //                 workspace.weak_handle(),
-                                    //                 window,
-                                    //                 cx,
-                                    //             )
-                                    //             .detach_and_log_err(cx);
-                                    //         })
-                                    //         .ok();
-                                    // }
-                                }),
-                            );
+                            let pane_ref = pane.read(cx);
+                            let project = pane_ref.project.upgrade();
+                            let item_path = pane_ref
+                                .item_for_index(ix)
+                                .and_then(|item| item.project_path(cx))
+                                .zip(project.as_ref())
+                                .and_then(|(project_path, project)| {
+                                    project.read(cx).absolute_path(&project_path, cx)
+                                });
+                            let active_item_path = pane_ref
+                                .active_item()
+                                .and_then(|item| item.project_path(cx))
+                                .zip(project.as_ref())
+                                .and_then(|(project_path, project)| {
+                                    project.read(cx).absolute_path(&project_path, cx)
+                                });
+                            menu = menu.item(ContextMenuItem::Entry(
+                                ContextMenuEntry::new("Compare with active tab")
+                                    .action(CompareWithActiveTab.boxed_clone())
+                                    .disabled(item_path.is_none() || active_item_path.is_none())
+                                    .handler(window.handler_for(&pane, move |_pane, window, cx| {
+                                        if let (Some(file1), Some(file2)) =
+                                            (active_item_path.clone(), item_path.clone())
+                                        {
+                                            window.dispatch_action(
+                                                Box::new(CompareFiles { file1, file2 }),
+                                                cx,
+                                            );
+                                        }
+                                    })),
+                            ));
                         }
 
                         if capability != Capability::ReadOnly {

@@ -399,6 +399,15 @@ pub struct CloseItemInAllPanes {
 #[action(namespace = workspace)]
 pub struct SendKeystrokes(pub String);
 
+/// Compares two files side by side in a diff view.
+#[derive(Clone, PartialEq, Debug, Deserialize, JsonSchema, Action)]
+#[action(namespace = workspace)]
+#[serde(deny_unknown_fields)]
+pub struct CompareFiles {
+    pub file1: PathBuf,
+    pub file2: PathBuf,
+}
+
 actions!(
     project_symbols,
     [

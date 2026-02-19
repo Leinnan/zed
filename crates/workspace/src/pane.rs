@@ -3175,21 +3175,21 @@ impl Pane {
                                 "Compare with active tab",
                                 Some(CompareWithActiveTab.boxed_clone()),
                                 window.handler_for(&pane, move |pane, window, cx| {
-                                    let selected_files = self.file_abs_paths_to_diff(cx);
-                                    if let Some((file_path1, file_path2)) = selected_files {
-                                        self.workspace
-                                            .update(cx, |workspace, cx| {
-                                                FileDiffView::open(
-                                                    file_path1,
-                                                    file_path2,
-                                                    workspace.weak_handle(),
-                                                    window,
-                                                    cx,
-                                                )
-                                                .detach_and_log_err(cx);
-                                            })
-                                            .ok();
-                                    }
+                                    // let selected_files = self.file_abs_paths_to_diff(cx);
+                                    // if let Some((file_path1, file_path2)) = selected_files {
+                                    //     self.workspace
+                                    //         .update(cx, |workspace, cx| {
+                                    //             FileDiffView::open(
+                                    //                 file_path1,
+                                    //                 file_path2,
+                                    //                 workspace.weak_handle(),
+                                    //                 window,
+                                    //                 cx,
+                                    //             )
+                                    //             .detach_and_log_err(cx);
+                                    //         })
+                                    //         .ok();
+                                    // }
                                 }),
                             );
                         }

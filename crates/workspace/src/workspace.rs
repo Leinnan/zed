@@ -399,15 +399,6 @@ pub struct CloseItemInAllPanes {
 #[action(namespace = workspace)]
 pub struct SendKeystrokes(pub String);
 
-/// Compares two files side by side in a diff view.
-#[derive(Clone, PartialEq, Debug, Deserialize, JsonSchema, Action)]
-#[action(namespace = workspace)]
-#[serde(deny_unknown_fields)]
-pub struct CompareFiles {
-    pub file1: PathBuf,
-    pub file2: PathBuf,
-}
-
 actions!(
     project_symbols,
     [
@@ -1226,6 +1217,17 @@ type PromptForOpenPath = Box<
     ) -> oneshot::Receiver<Option<Vec<PathBuf>>>,
 >;
 
+type CompareBuffersFn = Arc<
+    dyn Fn(
+            Entity<Buffer>,
+            Entity<Buffer>,
+            WeakEntity<Workspace>,
+            &mut Window,
+            &mut App,
+        ) + Send
+        + Sync,
+>;
+
 #[derive(Default)]
 struct DispatchingKeystrokes {
     dispatched: HashSet<Vec<Keystroke>>,
@@ -1284,6 +1286,7 @@ pub struct Workspace {
     bounds_save_task_queued: Option<Task<()>>,
     on_prompt_for_new_path: Option<PromptForNewPath>,
     on_prompt_for_open_path: Option<PromptForOpenPath>,
+    compare_buffers_fn: Option<CompareBuffersFn>,
     terminal_provider: Option<Box<dyn TerminalProvider>>,
     debugger_provider: Option<Arc<dyn DebuggerProvider>>,
     serializable_items_tx: UnboundedSender<Box<dyn SerializableItemHandle>>,
@@ -1712,6 +1715,7 @@ impl Workspace {
             bounds_save_task_queued: None,
             on_prompt_for_new_path: None,
             on_prompt_for_open_path: None,
+            compare_buffers_fn: None,
             terminal_provider: None,
             debugger_provider: None,
             serializable_items_tx,
@@ -2413,6 +2417,29 @@ impl Workspace {
 
     pub fn set_prompt_for_open_path(&mut self, prompt: PromptForOpenPath) {
         self.on_prompt_for_open_path = Some(prompt)
+    }
+
+    pub fn register_compare_buffers_handler(
+        &mut self,
+        f: impl Fn(Entity<Buffer>, Entity<Buffer>, WeakEntity<Workspace>, &mut Window, &mut App)
+            + Send
+            + Sync
+            + 'static,
+    ) {
+        self.compare_buffers_fn = Some(Arc::new(f));
+    }
+
+    pub fn compare_buffers(
+        &self,
+        old_buffer: Entity<Buffer>,
+        new_buffer: Entity<Buffer>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(compare_fn) = self.compare_buffers_fn.as_ref().cloned() {
+            let workspace = cx.entity().downgrade();
+            (compare_fn)(old_buffer, new_buffer, workspace, window, &mut *cx);
+        }
     }
 
     pub fn set_terminal_provider(&mut self, provider: impl TerminalProvider + 'static) {

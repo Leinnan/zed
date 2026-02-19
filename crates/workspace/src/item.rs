@@ -15,7 +15,7 @@ use gpui::{
     EventEmitter, FocusHandle, Focusable, Font, HighlightStyle, Pixels, Point, Render,
     SharedString, Task, WeakEntity, Window,
 };
-use language::Capability;
+use language::{Buffer, Capability};
 use project::{Project, ProjectEntryId, ProjectPath};
 pub use settings::{
     ActivateOnClose, ClosePosition, RegisterSetting, Settings, SettingsLocation, ShowCloseButton,
@@ -241,6 +241,9 @@ pub trait Item: Focusable + EventEmitter<Self::Event> + Render + Sized {
     }
     fn buffer_kind(&self, _cx: &App) -> ItemBufferKind {
         ItemBufferKind::None
+    }
+    fn singleton_buffer(&self, _cx: &App) -> Option<Entity<Buffer>> {
+        None
     }
     fn set_nav_history(&mut self, _: ItemNavHistory, _window: &mut Window, _: &mut Context<Self>) {}
 
@@ -477,6 +480,7 @@ pub trait ItemHandle: 'static + Send {
         _: &mut dyn FnMut(EntityId, &dyn project::ProjectItem),
     );
     fn buffer_kind(&self, cx: &App) -> ItemBufferKind;
+    fn singleton_buffer(&self, cx: &App) -> Option<Entity<Buffer>>;
     fn boxed_clone(&self) -> Box<dyn ItemHandle>;
     fn can_split(&self, cx: &App) -> bool;
     fn clone_on_split(
@@ -694,6 +698,10 @@ impl<T: Item> ItemHandle for Entity<T> {
 
     fn buffer_kind(&self, cx: &App) -> ItemBufferKind {
         self.read(cx).buffer_kind(cx)
+    }
+
+    fn singleton_buffer(&self, cx: &App) -> Option<Entity<Buffer>> {
+        self.read(cx).singleton_buffer(cx)
     }
 
     fn boxed_clone(&self) -> Box<dyn ItemHandle> {

@@ -248,16 +248,18 @@ pub fn init(cx: &mut App) {
                 cx,
             );
         });
-        workspace.register_action(|workspace, action: &workspace::CompareFiles, window, cx| {
-            file_diff_view::FileDiffView::open(
-                action.file1.clone(),
-                action.file2.clone(),
-                workspace.weak_handle(),
-                window,
-                cx,
-            )
-            .detach_and_log_err(cx);
-        });
+        workspace.register_compare_buffers_handler(
+            |old_buffer, new_buffer, workspace, window, cx| {
+                file_diff_view::FileDiffView::open_buffers(
+                    old_buffer,
+                    new_buffer,
+                    workspace,
+                    window,
+                    cx,
+                )
+                .detach_and_log_err(cx);
+            },
+        );
     })
     .detach();
 }

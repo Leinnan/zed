@@ -1,6 +1,6 @@
 use crate::{
-    CloseWindow, CompareFiles, NewFile, NewTerminal, OpenInTerminal, OpenOptions, OpenTerminal,
-    OpenVisible, SplitDirection, ToggleFileFinder, ToggleProjectSymbols, ToggleZoom, Workspace,
+    CloseWindow, NewFile, NewTerminal, OpenInTerminal, OpenOptions, OpenTerminal, OpenVisible,
+    SplitDirection, ToggleFileFinder, ToggleProjectSymbols, ToggleZoom, Workspace,
     WorkspaceItemBuilder, ZoomIn, ZoomOut,
     invalid_item_view::InvalidItemView,
     item::{
@@ -3172,33 +3172,40 @@ impl Pane {
                         };
                         if !is_active {
                             let pane_ref = pane.read(cx);
-                            let project = pane_ref.project.upgrade();
-                            let item_path = pane_ref
+                            let can_compare = pane_ref
                                 .item_for_index(ix)
-                                .and_then(|item| item.project_path(cx))
-                                .zip(project.as_ref())
-                                .and_then(|(project_path, project)| {
-                                    project.read(cx).absolute_path(&project_path, cx)
-                                });
-                            let active_item_path = pane_ref
-                                .active_item()
-                                .and_then(|item| item.project_path(cx))
-                                .zip(project.as_ref())
-                                .and_then(|(project_path, project)| {
-                                    project.read(cx).absolute_path(&project_path, cx)
-                                });
+                                .and_then(|item| item.singleton_buffer(cx))
+                                .is_some()
+                                && pane_ref
+                                    .active_item()
+                                    .and_then(|item| item.singleton_buffer(cx))
+                                    .is_some();
                             menu = menu.item(ContextMenuItem::Entry(
                                 ContextMenuEntry::new("Compare with active tab")
                                     .action(CompareWithActiveTab.boxed_clone())
-                                    .disabled(item_path.is_none() || active_item_path.is_none())
-                                    .handler(window.handler_for(&pane, move |_pane, window, cx| {
-                                        if let (Some(file1), Some(file2)) =
-                                            (active_item_path.clone(), item_path.clone())
+                                    .disabled(!can_compare)
+                                    .handler(window.handler_for(&pane, move |pane, window, cx| {
+                                        let active_buffer = pane
+                                            .active_item()
+                                            .and_then(|item| item.singleton_buffer(cx));
+                                        let selected_buffer = pane
+                                            .item_for_index(ix)
+                                            .and_then(|item| item.singleton_buffer(cx));
+                                        if let (Some(active_buffer), Some(selected_buffer)) =
+                                            (active_buffer, selected_buffer)
                                         {
-                                            window.dispatch_action(
-                                                Box::new(CompareFiles { file1, file2 }),
-                                                cx,
-                                            );
+                                            pane.workspace
+                                                .update(cx, |_, cx| {
+                                                    cx.defer_in(window, move |workspace, window, cx| {
+                                                        workspace.compare_buffers(
+                                                            active_buffer,
+                                                            selected_buffer,
+                                                            window,
+                                                            cx,
+                                                        );
+                                                    });
+                                                })
+                                                .ok();
                                         }
                                     })),
                             ));

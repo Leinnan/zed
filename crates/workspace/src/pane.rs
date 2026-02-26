@@ -3171,27 +3171,44 @@ impl Pane {
                             })
                         };
                         if !is_active {
-                            menu = menu.entry(
-                                "Compare with active tab",
-                                Some(CompareWithActiveTab.boxed_clone()),
-                                window.handler_for(&pane, move |pane, window, cx| {
-                                    // let selected_files = self.file_abs_paths_to_diff(cx);
-                                    // if let Some((file_path1, file_path2)) = selected_files {
-                                    //     self.workspace
-                                    //         .update(cx, |workspace, cx| {
-                                    //             FileDiffView::open(
-                                    //                 file_path1,
-                                    //                 file_path2,
-                                    //                 workspace.weak_handle(),
-                                    //                 window,
-                                    //                 cx,
-                                    //             )
-                                    //             .detach_and_log_err(cx);
-                                    //         })
-                                    //         .ok();
-                                    // }
-                                }),
-                            );
+                            let pane_ref = pane.read(cx);
+                            let can_compare = pane_ref
+                                .item_for_index(ix)
+                                .and_then(|item| item.singleton_buffer(cx))
+                                .is_some()
+                                && pane_ref
+                                    .active_item()
+                                    .and_then(|item| item.singleton_buffer(cx))
+                                    .is_some();
+                            menu = menu.item(ContextMenuItem::Entry(
+                                ContextMenuEntry::new("Compare with active tab")
+                                    .action(CompareWithActiveTab.boxed_clone())
+                                    .disabled(!can_compare)
+                                    .handler(window.handler_for(&pane, move |pane, window, cx| {
+                                        let active_buffer = pane
+                                            .active_item()
+                                            .and_then(|item| item.singleton_buffer(cx));
+                                        let selected_buffer = pane
+                                            .item_for_index(ix)
+                                            .and_then(|item| item.singleton_buffer(cx));
+                                        if let (Some(active_buffer), Some(selected_buffer)) =
+                                            (active_buffer, selected_buffer)
+                                        {
+                                            pane.workspace
+                                                .update(cx, |_, cx| {
+                                                    cx.defer_in(window, move |workspace, window, cx| {
+                                                        workspace.compare_buffers(
+                                                            active_buffer,
+                                                            selected_buffer,
+                                                            window,
+                                                            cx,
+                                                        );
+                                                    });
+                                                })
+                                                .ok();
+                                        }
+                                    })),
+                            ));
                         }
 
                         if capability != Capability::ReadOnly {

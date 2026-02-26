@@ -767,6 +767,10 @@ impl Item for Editor {
         }
     }
 
+    fn singleton_buffer(&self, cx: &App) -> Option<Entity<language::Buffer>> {
+        self.buffer.read(cx).as_singleton()
+    }
+
     fn can_save_as(&self, cx: &App) -> bool {
         self.buffer.read(cx).is_singleton()
     }

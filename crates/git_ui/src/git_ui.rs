@@ -248,6 +248,18 @@ pub fn init(cx: &mut App) {
                 cx,
             );
         });
+        workspace.register_compare_buffers_handler(
+            |old_buffer, new_buffer, workspace, window, cx| {
+                file_diff_view::FileDiffView::open_buffers(
+                    old_buffer,
+                    new_buffer,
+                    workspace,
+                    window,
+                    cx,
+                )
+                .detach_and_log_err(cx);
+            },
+        );
     })
     .detach();
 }
